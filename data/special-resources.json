@@ -1,0 +1,106 @@
+[
+  {
+    "category": "immigration",
+    "area": "US",
+    "name": "ImmigrationLawHelp.org",
+    "what": "Find free or low-cost nonprofit immigration legal help near you. Search by zip code or by detention center.",
+    "url": "https://www.immigrationlawhelp.org",
+    "source": "Immigration Advocates Network and Pro Bono Net (immigrationlawhelp.org/about)",
+    "verified": "2026-10-07"
+  },
+  {
+    "category": "immigration",
+    "area": "US",
+    "name": "Freedom for Immigrants: National Immigration Detention Hotline",
+    "what": "Free, confidential help for people in immigration detention. From inside detention, dial 9233# (Monday to Friday, 8am to 8pm Pacific). Families can email hotline@freedomforimmigrants.org.",
+    "phone": "9233#",
+    "url": "https://www.freedomforimmigrants.org/hotline",
+    "source": "freedomforimmigrants.org/hotline",
+    "verified": "2026-10-07"
+  },
+  {
+    "category": "immigration",
+    "area": "US",
+    "name": "Find someone held by ICE (ICE Detainee Locator)",
+    "what": "The government's search for adults in ICE custody. You need their country of birth and their A-number, or their name and birth date. It can take 1 to 2 days for a name to appear.",
+    "url": "https://locator.ice.gov/odls/",
+    "source": "National Immigrant Justice Center, 'What to do if you or a loved one is detained'",
+    "verified": "2026-10-07"
+  },
+  {
+    "category": "immigration",
+    "area": "US",
+    "name": "Immigration court hearing information",
+    "what": "Check a court date with the person's A-number.",
+    "phone": "1-800-898-7180",
+    "url": "https://acis.eoir.justice.gov/en/",
+    "source": "National Immigrant Justice Center",
+    "verified": "2026-10-07"
+  },
+  {
+    "category": "immigration",
+    "area": "US",
+    "name": "Know Your Rights red cards (Immigrant Legal Resource Center)",
+    "what": "Wallet cards that explain your rights if immigration agents come to your door, in 15 languages.",
+    "url": "https://www.ilrc.org/know-your-rights",
+    "source": "ilrc.org",
+    "verified": "2026-10-07"
+  },
+  {
+    "category": "immigration",
+    "area": "US",
+    "name": "United We Dream hotline",
+    "what": "Report immigration enforcement activity you see and get connected to help.",
+    "phone": "1-844-363-1423",
+    "source": "Listed in immigrant rights resource guides (Freedom for Immigrants resources, NYC legal help guides)",
+    "verified": "2026-10-07"
+  },
+  {
+    "category": "immigration",
+    "area": "WA",
+    "name": "Washington Immigrant Solidarity Network hotline",
+    "what": "Report a detention or immigration activity in Washington and get connected to resources. 7 days a week, 6am to 9pm.",
+    "phone": "1-844-724-3737",
+    "url": "https://waisn.org",
+    "source": "WA State Human Rights Commission; Solid Ground; King County",
+    "verified": "2026-10-07"
+  },
+  {
+    "category": "immigration",
+    "area": "IL",
+    "name": "ICIRR Family Support Hotline",
+    "what": "Support for families after an immigration raid or arrest. English, Spanish, Korean, and Polish.",
+    "phone": "1-855-435-7693",
+    "source": "National Immigrant Justice Center",
+    "verified": "2026-10-07"
+  },
+  {
+    "category": "immigration",
+    "area": "IL",
+    "name": "National Immigrant Justice Center Detention Project",
+    "what": "Legal help for people in immigration detention in the Midwest. Tuesdays 11am to 2pm. People in detention can call collect at (312) 583-9721.",
+    "phone": "(773) 672-6599",
+    "url": "https://immigrantjustice.org",
+    "source": "immigrantjustice.org",
+    "verified": "2026-10-07"
+  },
+  {
+    "category": "pets",
+    "area": "MN",
+    "name": "The Bond Between (Minneapolis)",
+    "what": "Free temporary foster care for pets while families affected by ICE detention get stable, plus free pet food and vet help.",
+    "email": "communitysolutions@thebondbetween.org",
+    "url": "https://www.thebondbetween.org",
+    "source": "thebondbetween.org; MPR News, Jan 22 2026; CBS Minnesota",
+    "verified": "2026-10-07"
+  },
+  {
+    "category": "pets",
+    "area": "US",
+    "name": "Pet care planning guide (The Bond Between)",
+    "what": "A free guide to making a plan for your pets in case of immigration detention. Some legal details are specific to Minnesota.",
+    "url": "https://www.thebondbetween.org/post/pet-care-planning-during-immigration-detainment-or-deportation",
+    "source": "thebondbetween.org",
+    "verified": "2026-10-07"
+  }
+]

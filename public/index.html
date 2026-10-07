@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mandy, Chat Assistant (test)</title>
+<style>
+  :root { --purple:#5b2a86; --purple-soft:#efe7f7; --ink:#1d1b20; --muted:#5f5a66; --bg:#ffffff; --card:#f7f6f9; --line:#ddd8e3; --alert:#fff4d6; --alert-line:#e0b33d; --crisis:#fde8e8; --crisis-line:#c0392b; }
+  @media (prefers-color-scheme: dark) { :root { --ink:#f1edf5; --muted:#b9b2c2; --bg:#16141a; --card:#211e27; --line:#3a3442; --purple-soft:#2c2238; --alert:#3a3020; --crisis:#3a2020; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font:18px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:var(--bg); }
+  header { background:var(--purple); color:#fff; padding:14px 16px; }
+  header h1 { margin:0; font-size:20px; }
+  header p { margin:4px 0 0; font-size:14px; opacity:.9; }
+  main { max-width:680px; margin:0 auto; padding:12px 16px 120px; }
+  .msg { margin:12px 0; padding:12px 14px; border-radius:14px; max-width:92%; white-space:pre-wrap; }
+  .me { background:var(--purple); color:#fff; margin-left:auto; border-bottom-right-radius:4px; }
+  .bot { background:var(--purple-soft); border-bottom-left-radius:4px; }
+  .quick { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0; }
+  .quick button, .fb button { font:inherit; font-size:16px; padding:10px 14px; border-radius:999px; border:2px solid var(--purple); background:var(--bg); color:var(--ink); cursor:pointer; min-height:44px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:8px 0; }
+  .card h3 { margin:0 0 4px; font-size:18px; }
+  .card .row { font-size:16px; color:var(--muted); margin:2px 0; }
+  .card a { color:var(--purple); font-weight:600; }
+  @media (prefers-color-scheme: dark) { .card a { color:#c9a6ef; } }
+  .alert { background:var(--alert); border-left:5px solid var(--alert-line); border-radius:8px; padding:10px 12px; margin:8px 0; font-size:16px; }
+  .crisis { background:var(--crisis); border-left:5px solid var(--crisis-line); border-radius:8px; padding:10px 12px; margin:8px 0; }
+  .crisis a { font-weight:700; color:inherit; }
+  .fb { display:flex; gap:8px; align-items:center; font-size:14px; color:var(--muted); margin:4px 0 12px; }
+  .fb button { padding:4px 12px; min-height:36px; font-size:18px; }
+  form { position:fixed; left:0; right:0; bottom:0; background:var(--bg); border-top:1px solid var(--line); padding:10px 16px; display:flex; gap:8px; justify-content:center; }
+  input { flex:1; max-width:560px; font:inherit; padding:12px 14px; border-radius:12px; border:2px solid var(--line); background:var(--bg); color:var(--ink); min-width:0; }
+  form button { font:inherit; padding:12px 16px; border-radius:12px; border:0; background:var(--purple); color:#fff; font-weight:600; }
+  .small { font-size:14px; color:var(--muted); }
+  .note { font-style:italic; font-size:15px; color:var(--muted); border-left:3px solid var(--purple); padding:4px 10px; margin:4px 0 12px; }
+  .choice { display:flex; flex-direction:column; gap:2px; text-align:left; font:inherit; font-size:16px; font-weight:600; padding:10px 14px; border-radius:14px; border:2px solid var(--purple); background:var(--bg); color:var(--ink) !important; text-decoration:none; cursor:pointer; width:100%; }
+  .choice .small { font-weight:400; }
+  #exit { font:inherit; font-size:15px; font-weight:700; background:#fff; color:var(--purple); border:0; border-radius:8px; padding:8px 12px; cursor:pointer; min-height:40px; }
+  .speak { background:none; border:0; color:var(--muted); font-size:14px; cursor:pointer; padding:2px 0 0; text-decoration:underline; }
+  #loc { font:inherit; font-size:14px; background:none; border:0; color:var(--purple); text-decoration:underline; cursor:pointer; padding:0; }
+  @media (prefers-color-scheme: dark) { #loc { color:#c9a6ef; } }
+  #clear { background:none; border:0; color:#fff; text-decoration:underline; font:inherit; font-size:14px; cursor:pointer; padding:0; }
+</style>
+</head>
+<body>
+<header>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+    <h1>Mandy <span style="font-weight:400;font-size:15px">Chat assistant (test version)</span></h1>
+    <button id="exit" type="button" aria-label="Quick exit: clear and leave this page">Quick exit</button>
+  </div>
+  <p>We don't save this chat or ask who you are. <button id="clear" type="button">Clear chat</button></p>
+</header>
+<main id="chat" aria-live="polite"></main>
+<form id="f">
+  <div style="flex:1;max-width:560px;display:flex;flex-direction:column;gap:4px">
+    <input id="q" autocomplete="off" placeholder="Type here, in any language" aria-label="Your message">
+    <span class="small"><button id="loc" type="button">Use my location</button> (optional, turned into a general area, never saved)</span>
+  </div>
+  <button>Send</button>
+</form>
+<script>
+const chat = document.getElementById('chat'), f = document.getElementById('f'), q = document.getElementById('q');
+let history = [];   // lives only in this tab; never saved
+let convoState = { locationAsks: 0 };
+let coords = null;  // only set if the person taps "Use my location"; rounded before sending
+
+function botMsg(text) {
+  const m = el('div', 'msg bot', text);
+  if ('speechSynthesis' in window) {
+    const s = el('button', 'speak', 'Read aloud'); s.type = 'button';
+    s.onclick = () => { speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance(text)); };
+    m.append(document.createElement('br'), s);
+  }
+  return m;
+}
+
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+// Links only ever go to the web, a phone number, or an email address.
+const link = (href, text) => { if (!/^(https?:|tel:|mailto:)/i.test(href)) return el('span', null, text); const a = el('a', null, text); a.href = href; if (!href.startsWith('tel:')) { a.target = '_blank'; a.rel = 'noopener'; } return a; };
+
+function start() {
+  chat.innerHTML = ''; history = []; convoState = { locationAsks: 0 }; coords = null;
+  chat.append(botMsg("Hi! I'm Mandy. I am here to help you find the resources you need. Just type or say what you are looking for and the area you are in."));
+  const quick = el('div', 'quick');
+  for (const [label, text] of [['Shelter', 'I am looking for shelter'], ['Food', 'I need food'], ['Health care', 'I need to see a doctor'], ['Showers and more', 'I need a shower'], ['Immigration help', 'I need help with immigration or ICE']]) {
+    const b = el('button', null, label); b.type = 'button'; b.onclick = () => send(text); quick.append(b);
+  }
+  chat.append(quick);
+}
+
+function card(l) {
+  const c = el('div', 'card');
+  c.append(el('h3', null, l.name));
+  const addr = [l.address, l.city, l.state, l.zip].filter(Boolean).join(', ');
+  const r1 = el('div', 'row'); r1.append(link('https://maps.google.com/?q=' + encodeURIComponent(addr), addr)); c.append(r1);
+  if (l.phone) { const r = el('div', 'row'); r.append('Call: ', link('tel:' + l.phone.replace(/[^\d+]/g, ''), l.phone)); c.append(r); }
+  c.append(el('div', 'row', 'Hours: ' + l.hours));
+  if (l.details) c.append(el('div', 'row', l.details));
+  const who = l.who.filter(w => w !== 'ALL');
+  if (who.length && who.length < 7) c.append(el('div', 'row', 'Serves: ' + who.join(', ').toLowerCase()));
+  if (l.website) { const r = el('div', 'row'); r.append(link(l.website, 'Website')); c.append(r); }
+  return c;
+}
+
+async function send(text) {
+  text = text.trim(); if (!text) return;
+  chat.append(el('div', 'msg me', text));
+  history.push({ role: 'user', content: text });
+  const wait = el('div', 'msg bot small', 'Looking...'); chat.append(wait); wait.scrollIntoView({ block: 'end' });
+  try {
+    const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: history, state: convoState, hour: new Date().getHours(), coords }) });
+    const d = await r.json(); wait.remove();
+    if (d.error) throw new Error(d.error);
+    convoState = d.state;
+    if (d.crisis.length) {
+      const box = el('div', 'crisis'); box.append(el('strong', null, 'Free help, 24 hours a day:'));
+      for (const c of d.crisis) { const p = el('div'); p.append(c.name + ': ', c.how); box.append(p); }
+      chat.append(box);
+    }
+    for (const a of d.alerts) { const box = el('div', 'alert'); box.append(el('strong', null, 'Alert: ' + a.title), el('div', null, a.detail), link(a.url, 'Source: ' + a.source)); chat.append(box); }
+    chat.append(botMsg(d.reply));
+    history.push({ role: 'assistant', content: d.reply });
+    if (d.note) chat.append(el('div', 'note', d.note));
+    (d.resources || []).forEach(r => {
+      const c = el('div', 'card');
+      c.append(el('h3', null, r.name), el('div', 'row', r.what));
+      if (r.phone) { const p = el('div', 'row'); p.append('Call: ', /^[\d()+\-\s]+$/.test(r.phone) ? link('tel:' + r.phone.replace(/[^\d+]/g, ''), r.phone) : r.phone); c.append(p); }
+      if (r.email) { const p = el('div', 'row'); p.append('Email: ', link('mailto:' + r.email, r.email)); c.append(p); }
+      if (r.url) { const p = el('div', 'row'); p.append(link(r.url, 'Website')); c.append(p); }
+      c.append(el('div', 'row small', (r.area === 'US' ? 'Nationwide' : r.area) + ' · checked ' + r.verified));
+      chat.append(c);
+    });
+    if (d.choices) {
+      const box = el('div', 'quick');
+      for (const c of d.choices) {
+        const b = c.url ? link(c.url, c.label) : el('button', null, c.label);
+        b.className = 'choice';
+        if (c.detail) { b.append(el('span', 'small', c.detail)); }
+        if (!c.url) { b.type = 'button'; b.onclick = () => send(c.send); }
+        box.append(b);
+      }
+      chat.append(box);
+    }
+    d.results.forEach(l => chat.append(card(l)));
+    if (d.results.length) {
+      const fb = el('div', 'fb', 'Was this helpful? ');
+      for (const [sym, label] of [['👍', 'Yes, helpful'], ['👎', 'Not helpful']]) {
+        const b = el('button', null, sym); b.type = 'button'; b.setAttribute('aria-label', label);
+        b.onclick = () => { fb.textContent = 'Thank you. (Test version: nothing is saved.)'; };
+        fb.append(b);
+      }
+      chat.append(fb);
+    }
+  } catch (e) {
+    wait.remove();
+    // Opened as a file instead of from the server: say so plainly instead of failing silently.
+    const hint = location.protocol === 'file:' ? ' (Test note: open http://localhost:8787 instead of the file.)' : '';
+    chat.append(el('div', 'msg bot', 'Sorry, something went wrong. Please try again, or call or text 211.' + hint));
+  }
+  chat.lastElementChild.scrollIntoView({ block: 'end' });
+}
+
+f.onsubmit = e => { e.preventDefault(); const t = q.value; q.value = ''; send(t); };
+document.getElementById('clear').onclick = start;
+// Quick exit: wipe the chat and replace this page in history, so "back" doesn't return here.
+document.getElementById('exit').onclick = () => { chat.innerHTML = ''; history = []; location.replace('https://www.google.com/search?q=weather'); };
+document.getElementById('loc').onclick = () => {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(p => {
+    coords = { lat: +p.coords.latitude.toFixed(2), lon: +p.coords.longitude.toFixed(2) };   // about 1 km
+    send(history.some(m => m.role === 'user') ? 'Here is my general location.' : 'I am looking for help near me.');
+  }, () => chat.append(botMsg("That's okay. You can type a city or a place nearby instead.")), { maximumAge: 600000, timeout: 10000 });
+};
+start();
+</script>
+</body>
+</html>

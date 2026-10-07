@@ -1,0 +1,13 @@
+{
+  "name": "shelterapp-aibot",
+  "version": "0.1.0",
+  "description": "ShelterApp assistant: helps people find services, suggest new ones, and report problems. Every new listing waits for an admin to approve it.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "start": "node src/server.ts",
+    "test": "node --test \"test/*.test.ts\""
+  },
+  "license": "SEE LICENSE IN LICENSE"
+}

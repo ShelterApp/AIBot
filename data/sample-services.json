@@ -1,0 +1,46 @@
+[
+  {
+    "id": "demo-1",
+    "name": "Sample Community Food Pantry (DEMO, not real)",
+    "type": ["food"],
+    "category": ["all"],
+    "address1": "100 Example St",
+    "city": "Seattle",
+    "state": "WA",
+    "zip": "98101",
+    "phone": "555-0100",
+    "serviceSummary": "Groceries and hot lunch",
+    "schedules": [
+      { "type": "weekly", "day": "monday", "startTime": "11:00", "endTime": "14:00" },
+      { "type": "weekly", "day": "wednesday", "startTime": "11:00", "endTime": "14:00" }
+    ]
+  },
+  {
+    "id": "demo-2",
+    "name": "Sample Women's Overnight Shelter (DEMO, not real)",
+    "type": ["shelter"],
+    "category": ["women"],
+    "address1": "200 Example Ave",
+    "city": "Seattle",
+    "state": "WA",
+    "zip": "98104",
+    "phone": "555-0101",
+    "serviceSummary": "Overnight beds, pets welcome",
+    "schedules": [{ "type": "fullDay" }]
+  },
+  {
+    "id": "demo-3",
+    "name": "Sample Health Clinic (DEMO, not real)",
+    "type": ["health"],
+    "category": ["all"],
+    "address1": "300 Example Way",
+    "city": "Tacoma",
+    "state": "WA",
+    "zip": "98402",
+    "phone": "555-0102",
+    "serviceSummary": "Walk-in primary care, sliding scale",
+    "schedules": [
+      { "type": "weekly", "day": "tuesday", "startTime": "09:00", "endTime": "17:00" }
+    ]
+  }
+]
