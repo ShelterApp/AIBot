@@ -28,7 +28,7 @@ Then open http://localhost:8787. Run the automated checks (safety phrases, no fa
 |---|---|
 | `src/bot.ts` | Conversation logic: message to search, search to reply |
 | `src/listings.ts` | Loads and searches listings (nearest zip, then area, then city) |
-| `src/disasters.ts` | Disaster mode: FEMA declarations and severe weather alerts by state |
+| `src/disasters.ts` | Disaster mode: FEMA declarations, severe weather alerts, and open emergency shelters (pet-friendly first) by state |
 | `src/safety.ts` | Crisis detection and crisis lines |
 | `src/llm.ts` | Client for any OpenAI-compatible model |
 | `src/matching.ts` | Duplicate detection for future "suggest a listing" (ported from the audit tool) |

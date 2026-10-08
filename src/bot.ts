@@ -4,7 +4,7 @@
 // in by code, so the model can't invent them.
 import { chat, type ChatMessage } from './llm.ts';
 import { searchListings, type Listing, type SearchQuery } from './listings.ts';
-import { alertsFor, type Alert } from './disasters.ts';
+import { alertsFor, openShelters, DISASTER_HELP, type Alert } from './disasters.ts';
 import { crisisKind, safetyMessage, CRISIS_LINES, type CrisisLine } from './safety.ts';
 import { placeToArea, coordsToArea } from './geo.ts';
 import { specialResources, aboutImmigration, aboutPets, type SpecialResource } from './special.ts';
@@ -82,9 +82,10 @@ Rules:
 function keywordSearch(text: string) {
   const t = text.toLowerCase();
   const map: [RegExp, string][] = [
-    [/sleep|bed|shelter|stay|tonight/, 'shelter'], [/food|eat|meal|hungry|pantry/, 'food'],
-    [/doctor|clinic|health|medic|dentist/, 'health'], [/job|work/, 'work'],
-    [/shower|laundry|clothes|phone|mail|\bid\b/, 'resources'],
+    // Whole words only: "Seattle" contains "eat", "Bedford" contains "bed".
+    [/\b(sleep\w*|beds?|shelters?|stay|tonight)\b/, 'shelter'], [/\b(food|eat\w*|meals?|hungry|pantry|pantries)\b/, 'food'],
+    [/\b(doctors?|clinics?|health|medic\w*|dentist)\b/, 'health'], [/\b(jobs?|work\w*)\b/, 'work'],
+    [/\b(shower\w*|laundry|clothes|phone|mail|id)\b/, 'resources'],
   ];
   return {
     type: map.find(([re]) => re.test(t))?.[1],
@@ -245,6 +246,9 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
       && !/shelter|bed|sleep|stay|food|eat|hungry|meal|doctor|clinic|health|shower|laundry|job|work/i.test(asked)) {
     q.type = undefined;
   }
+  // A storm, fire, or flood coming: they need a safe place, so look for emergency shelters.
+  const emergency = /evacuat\w*|hurricane|tropical storm|storm surge|flood\w*|wildfire|fire evac|tornado|hurac[aá]n|inundaci\w*|evacuar/i.test(allUser);
+  if (emergency && !q.type) q.type = 'shelter';
 
   // 2. Work out a general area: device location, then zip, then a nearby place, then city.
   if (ctx.coords) {
@@ -287,6 +291,11 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
   // 3. Search (facts come only from here).
   const results = hasPlace && q.type ? searchListings(all, { ...q, night }) : [];
   const alerts = hasPlace ? await alertsFor(q.state) : [];
+  // Emergency shelters when there's a disaster: FEMA's live list (pet-friendly first if they
+  // have pets), and always the Red Cross map and 211, since counties often report late.
+  const disaster = hasPlace && q.type === 'shelter' && (emergency || alerts.length > 0);
+  const emergencyShelters = disaster ? await openShelters(q.state, aboutPets(allUser)) : [];
+  const disasterResources = disaster ? [...emergencyShelters, ...DISASTER_HELP] : undefined;
 
   // 4. Decide what to say, following the conversation guide. The model writes only the
   //    empathy line; every fact, next step, question and safety line is fixed text, so
@@ -316,8 +325,18 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
     statement = `Here are places for ${need} near you. Please call ahead, since hours and space can change.`;
     if (alerts.length) statement += ' There are also official emergency alerts for your state above.';
     if (!q.zip) question = "If you tell me a street or a place nearby, I can show what's closest.";
+  } else if (disaster) {
+    statement = `I don't see a regular shelter listing near there.`;
   } else {
     statement = `I couldn't find ${need} listings near there yet. You can call or text 211, which helps anywhere in the US.`;
+  }
+  if (disaster) {
+    statement += emergencyShelters.length
+      ? (aboutPets(allUser) && emergencyShelters.some(r => /Accepts pets/.test(r.what))
+        ? ' Emergency shelters are open in your state. The ones that take pets are listed first.'
+        : ' Emergency shelters are open in your state, listed below.')
+      : " I don't see emergency shelters posted for your state yet. Counties often post them late, so the Red Cross map and 211 below will have the newest list, including ones that take pets.";
+    statement = statement.trim();
   }
   let choices: Choice[] | undefined;
   if (kind === 'suicide') {
@@ -362,5 +381,5 @@ Reply in the same language as the person's last message, which was: "${last.slic
   // Order: safety first, then the caring words, then the one question.
   // The small model sometimes answers in English anyway, so non-English replies are translated as a whole.
   const reply = [await translate(safety), await translate(caring.trim()), await translate([statement, bridge, question].filter(Boolean).join(' '))].filter(Boolean).join(' ');
-  return { reply, results, alerts, crisis, choices, state };
+  return { reply, results, alerts, crisis, choices, resources: disasterResources, state };
 }

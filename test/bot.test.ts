@@ -67,3 +67,10 @@ test('stays stateless and caps the location counter', async () => {
   const r = await respond(all, user('I need food'), { state: { locationAsks: 999 } });
   assert.ok(r.state.locationAsks <= 10);
 });
+
+test('a hurricane evacuation gets emergency shelter help, with the Red Cross map and 211', async () => {
+  const r = await respond(all, user('hurricane coming, we have to evacuate with our dog. I am in Seattle'));
+  assert.ok(r.resources?.some(x => x.url?.includes('redcross.org')));
+  assert.ok(r.resources?.some(x => x.phone === '211'));
+  assert.match(r.reply, /Emergency shelters are open|Red Cross map and 211/);
+});

@@ -39,6 +39,7 @@ The trade-off, honestly: a small model is less polished. It sometimes picks the 
 - **Data freshness is the real work.** Several night shelters in the listings show "Mon-Fri 8 AM to 5 PM," which looks like placeholder hours from old imports.
 - **Other data errors found while testing:** phone numbers of "(000) 000-0000", an address of ".", and a Seattle listing whose zip field holds the street number ("13470"). Mandy hides the first two; the data itself needs fixing.
 - **Coverage gaps show up fast.** In the local snapshot used for testing, Portland, Oregon had no food listings. The bot says so honestly and points to 211.
+- **Emergency shelters (added Oct 8, during Hurricane Isaias).** When someone talks about evacuating, or asks for shelter while their state has official alerts, Mandy shows open emergency shelters from FEMA's free Open Shelters feed, with pet-friendly ones first if they mention a pet. Counties often report to FEMA late (on Oct 8 the feed listed no Gulf Coast shelters while several were open), so Mandy says so plainly and always adds the Red Cross shelter map, 211, and the Disaster Distress Helpline. Next step: county emergency management pages by county.
 - **Disaster alerts are statewide for now.** A flood watch on the Florida coast showed for Tallahassee. Next step: match alerts to the person's county.
 
 ## Questions for Raj

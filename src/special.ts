@@ -4,7 +4,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 
 export interface SpecialResource {
-  category: 'immigration' | 'pets';
+  category: 'immigration' | 'pets' | 'disaster';
   area: string;          // "US" or a two-letter state
   name: string;
   what: string;
