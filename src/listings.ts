@@ -51,6 +51,14 @@ export function safeUrl(s: string): string {
 
 const split = (s: unknown) => String(s ?? '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
 
+// Older audit exports split "Street, Suite 100, City, ST, ZIP" from the front, so a suite
+// became the city (and the state was lost) and a street number could become the ZIP.
+// Reading the full address from the end fixes both; other shapes keep the saved fields.
+export function fromAddress(full: string): { address1: string; city: string; state: string; zip: string } | null {
+  const m = full.trim().match(/^(.+),\s*([^,]+),\s*([A-Za-z]{2})(?:,\s*|\s+)(\d{5})(?:-\d{4})?$/);
+  return m ? { address1: m[1].trim(), city: m[2].trim(), state: m[3].toUpperCase(), zip: m[4] } : null;
+}
+
 // Reads either an audit-tool inventory export (real listings) or the small demo file.
 // Only approved listings are used, and staff fields like `added_by` are dropped.
 export function loadListings(path: string): Listing[] {
@@ -58,6 +66,7 @@ export function loadListings(path: string): Listing[] {
   const raw = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>[];
   return raw
     .filter(r => !r.approval || r.approval === 'Approved')
+    .map(r => ({ ...r, ...fromAddress(String(r.address_full ?? '')) }))
     .map(r => ({
       name: String(r.name ?? ''),
       address: /[a-z0-9]/i.test(String(r.address1 ?? '')) ? String(r.address1) : '',   // drop "." placeholders

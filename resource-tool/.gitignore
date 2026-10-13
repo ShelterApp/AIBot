@@ -1,0 +1,30 @@
+# === SECRETS — never commit ===
+google_places_key.txt
+.env
+*.key
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# === Runtime state, caches, reports, logs (all under audit_results/) ===
+# The folder is kept (via .keep); its generated contents are not tracked.
+audit_results/*
+!audit_results/.keep
+
+# === Packaging / build artifacts ===
+dist/
+build/
+*.zip
+
+# === Playwright browser profile (created in your home dir at runtime) ===
+.shelterapp-audit-browser/
+
+# === OS / editor cruft ===
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

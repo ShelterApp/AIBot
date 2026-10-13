@@ -1,0 +1,105 @@
+================================================================
+  SHELTERAPP AUDIT — COMMAND CHEAT SHEET
+  Each line is ONE copy-paste. It includes the folder, so it works
+  no matter where your terminal is. Log in + press ENTER when asked.
+================================================================
+
+
+=== ADD MISSING FQHCs — NATIONAL ROLLOUT (current task) ===
+
+# Preview a state (shows what it WOULD add, submits nothing):
+cd /d C:\audit && py batch_fqhc.py --states CA --dry-run
+
+# Finish Arizona:
+cd /d C:\audit && py batch_fqhc.py --states AZ
+
+# Do one state (small/medium states are fine whole):
+cd /d C:\audit && py batch_fqhc.py --states NV
+
+# BIG states (CA, TX, NY) — do 100 at a time, run again to continue:
+cd /d C:\audit && py batch_fqhc.py --states CA --add-max-per-state 100
+
+# Do the next 3 states that aren't done yet:
+cd /d C:\audit && py batch_fqhc.py --max-states 3
+
+# Do ALL remaining states (very long):
+cd /d C:\audit && py batch_fqhc.py
+
+# Progress saved automatically:
+#   audit_results\fqhc_progress.json       (states done)
+#   audit_results\fqhc_batch_summary.csv   (counts per state)
+#   audit_results\batch_fqhc.log           (live log)
+
+
+=== ADD LIBRARIES — NATIONAL (OSM, state by state, alphabetical) ===
+
+# Preview all states (no browser):
+cd /d C:\audit && py batch_osm_state.py --category library --dry-run
+
+# Next 5 states, 100 adds each:
+cd /d C:\audit && py batch_osm_state.py --category library --max-states 5 --add-max-per-state 100
+
+# One state (chunk a big one like CA):
+cd /d C:\audit && py batch_osm_state.py --category library --states CA --add-max-per-state 100
+
+# (also works for other OSM categories: --category resource_center / animal_shelter)
+# Progress: audit_results\osm_state_progress_library.json + osm_state_summary.csv
+
+
+=== ADD RESOURCE CENTERS — NATIONAL (OSM, metro by metro) ===
+
+# Preview all metros (no browser):
+cd /d C:\audit && py batch_osm.py --dry-run
+
+# Do the next 3 pending metros:
+cd /d C:\audit && py batch_osm.py --max-metros 3
+
+# One metro, capped:
+cd /d C:\audit && py batch_osm.py --metros "Chicago, IL" --add-max-per-metro 50
+
+# Progress: audit_results\osm_progress_resource_center.json + osm_batch_summary.csv
+
+
+=== SCAN ONE AREA + ADD MISSING (all categories) ===
+
+# Preview:
+cd /d C:\audit && py pipeline.py --area "Phoenix, Arizona" --radius 40 --skip-audit --dry-run
+
+# Do it:
+cd /d C:\audit && py pipeline.py --area "Phoenix, Arizona" --radius 40 --skip-audit
+
+
+=== AUDIT EXISTING LISTINGS + FIX ERRORS ===
+
+# Audit (find errors) — slower:
+cd /d C:\audit && py pipeline.py --area "Phoenix, Arizona" --radius 40 --no-input
+
+# Auto-fix wrong ZIP codes (preview, then apply):
+cd /d C:\audit && py fix_zips.py
+cd /d C:\audit && py pipeline.py --apply-fixes audit_results\proposals_zip.csv --dry-run
+cd /d C:\audit && py pipeline.py --apply-fixes audit_results\proposals_zip.csv
+
+# Upgrade "contact for hours" -> REAL hours (when open data has them).
+# THREE commands, no file editing — the --yes does the "clicking yes" for you:
+cd /d C:\audit && py propose_hours.py --category library --states WA,TX,OH --yes
+cd /d C:\audit && py pipeline.py --apply-hours audit_results\proposals_hours.csv --dry-run
+cd /d C:\audit && py pipeline.py --apply-hours audit_results\proposals_hours.csv
+#   1st line  = find the upgradeable libraries in those states and approve them all.
+#   2nd line  = PREVIEW (changes nothing) — read it to make sure it looks right.
+#   3rd line  = apply for real (log in + press ENTER when asked).
+# To skip one bad row: open audit_results\proposals_hours.csv and change its 'yes' to 'no'
+#   (only if you need to). Omit --yes if you'd rather approve rows by hand.
+# NOTE: reads the cached inventory snapshot; to include recently-added listings (e.g. the
+#   library rollout) refresh first with a --recheck pipeline run.
+
+# Sort flagged listings for cleanup:
+cd /d C:\audit && py triage.py
+
+
+=== HELPFUL ADD-ONS (append to any pipeline.py line) ===
+  --dry-run        preview only
+  --add-max N      add at most N this run
+  --no-input       audit only, don't add
+  --skip-audit     scan + add only (no slow audit)
+  --recheck        refresh the cached listing inventory
+================================================================

@@ -1,8 +1,15 @@
 # AIBot
 
-AI Bot to add and validate services in ShelterApp.
+AI Bot to add and validate services in ShelterApp, and to help people find them.
 
 **Status: test version (October 2026).** A "Find help now" assistant: a person says what they need and where, in their own words and language, and gets matching ShelterApp listings, official disaster alerts for their state, and crisis lines when they may be in danger.
+
+This repo has two parts, both built by Amanda J. Richer:
+
+1. **Mandy** (the root folder): the "Find help now" assistant described below.
+2. **The resource tool** (`resource-tool/`): finds resources missing from ShelterApp (health centers, resource centers, shelters, libraries) from free public data, adds them with strong duplicate protection, and audits existing listings for bad or placeholder data. This is the "add and validate services" part. Python; start with `resource-tool/README.md`, and run its offline checks with `py run.py --selftest` inside that folder.
+
+They work together: the resource tool keeps a checked copy of ShelterApp's listings in `resource-tool/audit_results/inventory_master.json`, and Mandy reads that file automatically when it's there. That folder holds working data and is never committed.
 
 ## Promises this code keeps
 

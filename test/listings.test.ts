@@ -44,3 +44,14 @@ test('search: nearest first, never far away, 24/7 first at night', () => {
   assert.deepEqual(searchListings(all, { type: 'shelter', zip: '33101' }), []);
   assert.equal(searchListings(all, { type: 'shelter', city: 'seattle', who: 'men' }).length, 1); // women-only excluded
 });
+
+test('addresses with a suite keep their state, and street numbers never become ZIPs', () => {
+  const f = join(dir, 'suite.json');
+  writeFileSync(f, JSON.stringify([
+    { name: 'Peer Clinic', address_full: '1520 Bellevue Ave, Suite 100, Seattle, WA, 98122', address1: '1520 Bellevue Ave', city: 'Suite 100', state: null, zip: '98122', services: 'HEALTH', approval: 'Approved' },
+    { name: 'Kirkland Place', address_full: '10604 NE 38th Pl, Kirkland, WA, 98033', address1: '10604 NE 38th Pl', city: 'Kirkland', state: 'WA', zip: '10604', services: 'FOOD', approval: 'Approved' },
+  ]));
+  const [a, b] = loadListings(f);
+  assert.deepEqual([a.address, a.city, a.state, a.zip], ['1520 Bellevue Ave, Suite 100', 'Seattle', 'WA', '98122']);
+  assert.equal(b.zip, '98033');
+});

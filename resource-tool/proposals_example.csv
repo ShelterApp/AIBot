@@ -1,0 +1,4 @@
+name,field,old_value,new_value,source_url,apply
+A New Leaf,address1,2230 W 6th St,868 E University Dr,https://turnanewleaf.org/contact/,yes
+A New Leaf,zip,85001,85203,https://turnanewleaf.org/contact/,yes
+A New Leaf,phone,(480) 498-6500,(480) 969-4024,https://turnanewleaf.org/contact/,yes

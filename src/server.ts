@@ -9,8 +9,9 @@ import { respond } from './bot.ts';
 if (existsSync('.env')) process.loadEnvFile('.env');
 
 const PORT = Number(process.env.PORT ?? 8787);
-// Real listings come from LISTINGS_PATH (set in .env); otherwise the fake demo listings.
-const source = [process.env.LISTINGS_PATH, 'data/sample-services.json'].find(p => p && existsSync(p)) ?? 'data/sample-services.json';
+// Real listings come from LISTINGS_PATH (set in .env), then the checked listings the
+// resource tool keeps in resource-tool/audit_results/, otherwise the fake demo listings.
+const source = [process.env.LISTINGS_PATH, 'resource-tool/audit_results/inventory_master.json', 'data/sample-services.json'].find(p => p && existsSync(p)) ?? 'data/sample-services.json';
 const listings = loadListings(source);
 console.log(`Loaded ${listings.length} listings from ${source}`);
 
