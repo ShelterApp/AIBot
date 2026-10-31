@@ -9,9 +9,9 @@ import { crisisKind, crisisBox, isSpanishCrisis, safetyMessage, type CrisisKind,
 import { placeToArea, coordsToArea } from './geo.ts';
 import { specialResources, aboutImmigration, aboutPets, type SpecialResource } from './special.ts';
 
-// Not personal data: just how many times we've asked about location, echoed back
-// by the browser so the server stays stateless.
-export interface ConvoState { locationAsks: number }
+// Not personal data: how many times we've asked about location, and the kind of help
+// asked for ("shelter", "food"), echoed back by the browser so the server stays stateless.
+export interface ConvoState { locationAsks: number; need?: string }
 
 export interface Context {
   state?: ConvoState;
@@ -50,7 +50,7 @@ const TALK_CHOICES_ES: Choice[] = [
   { label: 'Buscar refugio, comida u otra ayuda', send: 'Necesito ayuda para encontrar recursos' },
 ];
 
-const TYPES =['food', 'shelter', 'health', 'resources', 'work'];
+const TYPES = ['food', 'shelter', 'health', 'resources', 'work'];
 const WHO = ['men', 'women', 'kids', 'seniors', 'disabled', 'families', 'lgbt'];
 const FEELINGS = ['upset', 'angry', 'scared', 'hopeless', 'overwhelmed', 'tired'];
 
@@ -96,6 +96,7 @@ Rules:
 - Do only what "What to say" asks. Do NOT ask any question: the app adds any question after your words.
 - Write at most THREE short sentences.
 - Never offer to talk, chat, or "figure things out together": you only help find resources.
+- Never offer help or say what you or the app can do or find: the app adds that after your words.
 - Never say whether places are open, full, or available: you don't know, and the app shows the listings.
 - Never repeat their words back like a robot ("You are homeless."). Say it the way a caring person would.
 - Never say "I understand exactly how you feel", never pity, never use cheerful filler, never promise things will be okay.
@@ -104,11 +105,16 @@ Rules:
 - Never ask for a name, phone number, ID, or why they are homeless. Never lecture or say "you should".
 - Say "shelter", never "facility" or "placement". Never say "the homeless" or "clients".`;
 
+// The small model likes to add its own offer ("I can help you find shelter"), which can
+// clash with the app's next step, so only its caring sentences are kept.
+const OFFER = /\b(?:i|we)(?:'ll| can| could| will)\b|\b(?:let me|let's|options?|opciones|puedo|podemos|posso|hay lugares)\b/i;
+const caringOnly = (text: string) => text.split(/(?<=[.!?])\s+/).filter(s => !OFFER.test(s)).join(' ').trim();
+
 function keywordSearch(text: string) {
   const t = text.toLowerCase();
   const map: [RegExp, string][] = [
     // Whole words only: "Seattle" contains "eat", "Bedford" contains "bed".
-    [/\b(sleep\w*|beds?|shelters?|stay|tonight)\b/, 'shelter'], [/\b(food|eat\w*|meals?|hungry|pantry|pantries)\b/, 'food'],
+    [/\b(sleep\w*|beds?|shelters?|housing|stay|tonight)\b/, 'shelter'], [/\b(food|eat\w*|meals?|hungry|pantry|pantries)\b/, 'food'],
     [/\b(doctors?|clinics?|health|medic\w*|dentist)\b/, 'health'], [/\b(jobs?|work\w*)\b/, 'work'],
     [/\b(shower\w*|laundry|clothes|phone|mail|id)\b/, 'resources'],
   ];
@@ -220,7 +226,8 @@ const NEED_WORDS: Record<string, string> = { shelter: 'shelter', food: 'food', h
 export async function respond(all: Listing[], history: ChatMessage[], ctx: Context = {}): Promise<BotReply> {
   const last = history.filter(m => m.role === 'user').at(-1)?.content ?? '';
   const convo = history.slice(-8).map(m => `${m.role === 'user' ? 'Person' : 'Helper'}: ${m.content}`).join('\n');
-  const state: ConvoState = { locationAsks: Math.max(0, Math.min(10, Number(ctx.state?.locationAsks) || 0)) };
+  const remembered = TYPES.includes(ctx.state?.need ?? '') ? ctx.state?.need : undefined;
+  const state: ConvoState = { locationAsks: Math.max(0, Math.min(10, Number(ctx.state?.locationAsks) || 0)), ...(remembered ? { need: remembered } : {}) };
 
   // 1. Understand the message.
   let q: ReturnType<typeof clean>;
@@ -231,10 +238,14 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
     modelUp = false;
     q = { ...clean({}), ...keywordSearch(history.filter(m => m.role === 'user').map(m => m.content).join(' ')) };
   }
-  // The small model sometimes misses the obvious, so plain code fills the gaps.
+  // The small model sometimes misses the obvious, so plain code fills the gaps, newest
+  // message first: people may give their location in one message and their need in another.
   q.type ??= keywordSearch(last).type;
-  if (!q.zip && !q.city) Object.assign(q, findPlaceInText(all, last));
-  if (!q.state) q.state = findStateInText(last);
+  for (const said of history.filter(m => m.role === 'user').map(m => m.content).reverse()) {
+    q.state ??= findStateInText(said);
+    if (!q.zip && !q.city) Object.assign(q, { zip: keywordSearch(said).zip }, findPlaceInText(all, said));
+    if (q.zip || q.city) break;
+  }
 
   // Safety: fixed patterns first, then the model's safety question, then its danger field.
   const kind = crisisKind(last) ?? (modelUp && last ? await safetyCheck(last) : null) ?? q.danger ?? null;
@@ -265,19 +276,25 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
     }
   }
 
+  // The model reads the whole conversation, but care belongs to what was just said, so
+  // "Main and 10th" doesn't hear "Not having a place to go is really hard" all over again.
+  if (history.filter(m => m.role === 'user').length > 1) q.shared_situation = false;
   // Small models miss this sometimes, so code catches the common ways people say it too.
   if (/homeless|unhoused|no ?where to (go|stay|sleep)|no place to (go|stay|sleep)|kicked out|evicted|sleeping (outside|outdoors|in my car|on the street)|lost my (home|house|apartment|place)|don'?t know what to do/i.test(last)) {
     q.shared_situation = true;
   }
   // Someone who only says "I'm homeless" hasn't asked for anything yet: ask, don't assume.
   const asked = history.filter(m => m.role === 'user').map(m => m.content).join(' ');
-  if (q.shared_situation && (!q.language || /english/i.test(q.language))
-      && !/shelter|bed|sleep|stay|food|eat|hungry|meal|doctor|clinic|health|shower|laundry|job|work/i.test(asked)) {
+  if (q.shared_situation && !state.need && (!q.language || /english/i.test(q.language))
+      && !/shelter|housing|bed|sleep|stay|food|eat|hungry|meal|doctor|clinic|health|shower|laundry|job|work/i.test(asked)) {
     q.type = undefined;
   }
+  // What they already asked for still stands, in any language, until they ask for something else.
+  q.type ??= state.need;
   // A storm, fire, or flood coming: they need a safe place, so look for emergency shelters.
   const emergency = /evacuat\w*|hurricane|tropical storm|storm surge|flood\w*|wildfire|fire evac|tornado|hurac[aá]n|inundaci\w*|evacuar/i.test(allUser);
   if (emergency && !q.type) q.type = 'shelter';
+  if (q.type) state.need = q.type;
 
   // 2. Work out a general area: device location, then zip, then a nearby place, then city.
   if (ctx.coords) {
@@ -285,8 +302,13 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
     if (area) Object.assign(q, { zip: area.zip ?? q.zip, city: area.city ?? q.city, state: area.state ?? q.state });
   } else if (!q.zip && q.place && (q.city || q.state)) {
     // Only look up a place once we know the city, or "a corner store" could match anywhere.
-    const area = await placeToArea(q.place, q.city, q.state);
-    if (area) Object.assign(q, { zip: area.zip ?? q.zip, city: q.city ?? area.city, state: q.state ?? area.state });
+    // It needs the state too: "Main and 10th, Tacoma" alone lands in Tulsa. A city in two
+    // states waits for the "which state?" question below.
+    const known = inferState(all, q);
+    const area = known.choices.length ? null : await placeToArea(q.place, q.city, known.state);
+    if (area && (!known.state || area.state === known.state) && (!q.city || area.city === q.city)) {
+      Object.assign(q, { zip: area.zip ?? q.zip, city: q.city ?? area.city, state: q.state ?? area.state });
+    }
   }
   const where = inferState(all, q);
   if (where.choices.length && q.city) {
@@ -396,6 +418,7 @@ Reply in the same language as the person's last message, which was: "${last.slic
       ], { maxTokens: 100 });
     } catch { modelUp = false; }
   }
+  caring = caringOnly(caring);
   if (!caring && empathy) {
     caring = angry ? "It sounds like you've been turned away a lot. That's exhausting." : 'Thank you for telling me. That sounds really hard.';
   }

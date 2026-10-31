@@ -25,7 +25,8 @@ Do not:
 - rush past the feeling to a list,
 - use cheerful filler ("Great question!", "No worries!"),
 - promise things will be okay,
-- pity ("you poor thing", "so brave").
+- pity ("you poor thing", "so brave"),
+- repeat the same acknowledgment on every turn: say it once, to what was just said.
 
 ## 2. De-escalation
 
@@ -100,6 +101,8 @@ Many people don't know the zip code where they are, especially when they are pus
 3. Optional **Use my location** button, explained honestly. Turned into a general area, never saved.
 4. If they can't or won't say, show citywide options (open 24/7 first at night) and crisis lines.
 5. Never ask about location more than twice before showing something useful.
+6. Remember what they already asked for, in any language. Never ask "Are you looking for shelter?" after they've said so.
+7. Trust a street only if it lands in the same city and state they gave. If it doesn't, stay with their city. Never search somewhere they didn't say.
 
 ## 7. Words
 
