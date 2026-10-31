@@ -14,8 +14,8 @@ They work together: the resource tool keeps a checked copy of ShelterApp's listi
 ## Promises this code keeps
 
 - **No personal data.** No sign-in, no names, no phone numbers. Conversations are never saved or logged; the chat lives only in the person's browser tab.
-- **Facts come from ShelterApp, never from the AI.** The model only (1) turns a message into a search and (2) writes a short, kind sentence. Names, addresses, phones, hours and alerts are filled in by code.
-- **Crisis lines are fixed code.** If a message suggests danger, 911, 988 and the domestic violence hotline always show.
+- **Facts come from ShelterApp, never from the AI.** The model only (1) turns a message into a search, (2) checks it for signs of danger, and (3) writes a short, kind sentence. Names, addresses, phones, hours and alerts are filled in by code.
+- **Crisis lines are fixed code.** 911, 988 and the domestic violence hotline stay on screen at all times, and show again first if a message suggests danger.
 - **Free to run.** Works with a free local model (Ollama) or any OpenAI-compatible endpoint, including free hosted tiers.
 
 ## Try it

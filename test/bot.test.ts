@@ -23,6 +23,36 @@ test('crisis lines always show, even with the model down', async () => {
   assert.ok(r.choices?.some(c => c.url?.includes('988')));
 });
 
+test('crisis messages that once slipped through show the lines with the model down', async () => {
+  for (const t of [
+    'I have all my pills saved up and I am done', 'Nobody would notice if I was gone', 'Mi esposo me pegó y tengo miedo',
+    'My ex found where I sleep and I am scared', 'Someone grabbed me at the shelter last night',
+  ]) assert.equal((await respond(all, user(t))).crisis.length, 3, t);
+});
+
+test('a threat from someone else gets the safety message, not the suicide message', async () => {
+  const r = await respond(all, user('He said he will kill me if I go back'));
+  assert.equal(r.crisis.length, 3);
+  assert.match(r.reply, /^You deserve to be safe\./);
+  assert.doesNotMatch(r.reply, /ending your life/);
+});
+
+test('a Spanish crisis gets fixed Spanish words, even with the model down', async () => {
+  const r = await respond(all, user('No quiero vivir más'));
+  assert.match(r.reply, /^Me alegra mucho que me lo hayas dicho\./);
+  assert.doesNotMatch(r.reply, /feliz/);
+  assert.match(r.crisis[0].how, /presiona 2/);
+  assert.match(r.crisis[0].how, /AYUDA/);
+  assert.match(r.crisisTitle ?? '', /^Ayuda gratis/);
+  assert.match(r.choices?.[0].label ?? '', /^Hablar con alguien/);
+});
+
+test('an English crisis keeps the English words', async () => {
+  const r = await respond(all, user('I want to die'));
+  assert.equal(r.crisisTitle, undefined);
+  assert.match(r.crisis[0].how, /^Call or text 988/);
+});
+
 test('abuse gets the dignity note and an offer of help', async () => {
   const r = await respond(all, user('fuck you, you stupid bot'));
   assert.equal(r.note, 'ShelterApp believes in treating all beings with dignity and respect.');

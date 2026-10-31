@@ -3,8 +3,8 @@
 //
 // Why a small free model: ShelterApp has no AI budget, and paid models charge for
 // every word, every conversation. Mandy uses the model as little as possible (one
-// call to understand a message, one short caring sentence when needed); everything
-// else is plain code. See "Why we built it this way" in DESIGN.md.
+// call to understand a message, one safety check, one short caring sentence when
+// needed); everything else is plain code. See "Why we built it this way" in DESIGN.md.
 
 export interface ChatMessage { role: 'system' | 'user' | 'assistant'; content: string }
 

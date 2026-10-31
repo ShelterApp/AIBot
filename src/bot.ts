@@ -1,11 +1,11 @@
-// The conversation logic, following CONVERSATION-GUIDE.md. The model does two
-// narrow jobs: (1) understand what someone typed, and (2) write a few warm
-// sentences. Listings, phone numbers, hours, alerts and crisis lines are filled
-// in by code, so the model can't invent them.
+// The conversation logic, following CONVERSATION-GUIDE.md. The model does three
+// narrow jobs: (1) understand what someone typed, (2) check for signs of danger, and
+// (3) write a few warm sentences. Listings, phone numbers, hours, alerts and crisis
+// lines are filled in by code, so the model can't invent them.
 import { chat, type ChatMessage } from './llm.ts';
 import { searchListings, type Listing, type SearchQuery } from './listings.ts';
 import { alertsFor, openShelters, DISASTER_HELP, type Alert } from './disasters.ts';
-import { crisisKind, safetyMessage, CRISIS_LINES, type CrisisLine } from './safety.ts';
+import { crisisKind, crisisBox, isSpanishCrisis, safetyMessage, type CrisisKind, type CrisisLine } from './safety.ts';
 import { placeToArea, coordsToArea } from './geo.ts';
 import { specialResources, aboutImmigration, aboutPets, type SpecialResource } from './special.ts';
 
@@ -24,6 +24,7 @@ export interface BotReply {
   results: Listing[];
   alerts: Alert[];
   crisis: CrisisLine[];
+  crisisTitle?: string;                // the crisis box heading, when it isn't in English
   resources?: SpecialResource[];      // hand-checked help, e.g. for people targeted by ICE
   note?: string;                       // the dignity note, shown apart from Mandy's words
   choices?: Choice[];                  // buttons: a link to a person, or a message to send
@@ -43,7 +44,13 @@ const TALK_CHOICES: Choice[] = [
   { label: 'Find shelter, food, or other help', send: 'I need help finding resources' },
 ];
 
-const TYPES = ['food', 'shelter', 'health', 'resources', 'work'];
+// The same moment in Spanish. The peer warmline joins once its Spanish help is confirmed.
+const TALK_CHOICES_ES: Choice[] = [
+  { label: 'Hablar con alguien ahora', detail: 'Marca 988 y presiona 2, o envía la palabra AYUDA al 988', url: 'https://988lifeline.org/interpretation-services/servicios-en-espanol/' },
+  { label: 'Buscar refugio, comida u otra ayuda', send: 'Necesito ayuda para encontrar recursos' },
+];
+
+const TYPES =['food', 'shelter', 'health', 'resources', 'work'];
 const WHO = ['men', 'women', 'kids', 'seniors', 'disabled', 'families', 'lgbt'];
 const FEELINGS = ['upset', 'angry', 'scared', 'hopeless', 'overwhelmed', 'tired'];
 
@@ -64,6 +71,24 @@ A place to sleep, a bed, or somewhere to stay means "shelter". Eating or meals m
 Jobs mean "work". Showers, laundry, phones, ID, mail, clothes mean "resources".
 Use the whole conversation: they may give their location in one message and their need in another.
 Never guess a location they did not give.`;
+
+const SAFETY_PROMPT = `You check one message sent to a helper for people who may be experiencing homelessness. Decide if the person may be at risk. Reply with JSON only: {"risk": "suicide" or "danger" or "none"}
+
+"suicide": they may want to die or hurt themselves, even if they only hint at it. This includes feeling like a burden, saying others would be better off, having no reason to go on, saying goodbye, giving things away, or mentioning a plan or the means to do it.
+"danger": another person may be hurting, threatening, following, trapping, or sexually exploiting them, or they say they do not feel safe, even if they only hint at it.
+"none": everything else. Being homeless, evicted, or kicked out is "none". So is needing a place tonight, alone or with family. So is being tired, hungry, cold, sick, sad, or out of medicine. So is having things stolen, being moved along by police, or being angry about how they have been treated.
+
+Any language. If you truly cannot tell between "none" and a risk, choose the risk.`;
+
+// Asked on its own, because the small model often skips "danger" when it is one field
+// among many. It leans toward a false alarm, which costs one gentle line and never blocks
+// help, over a miss. Tested on made-up messages only: see "Safety" in CONVERSATION-GUIDE.md.
+async function safetyCheck(text: string): Promise<CrisisKind> {
+  try {
+    const raw = await chat([{ role: 'system', content: SAFETY_PROMPT }, { role: 'user', content: text }], { json: true, maxTokens: 30 });
+    return (raw.match(/suicide|danger/i)?.[0].toLowerCase() ?? null) as CrisisKind;
+  } catch { return null; }
+}
 
 const REPLY_PROMPT = `You are Mandy, ShelterApp's automated helper (not a person) for people who may be experiencing homelessness.
 Speak like a kind, steady outreach worker: plain words, short sentences, no jargon.
@@ -211,10 +236,14 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
   if (!q.zip && !q.city) Object.assign(q, findPlaceInText(all, last));
   if (!q.state) q.state = findStateInText(last);
 
-  // Safety: fixed patterns first, the model's danger check as a second net.
-  const kind = crisisKind(last) ?? q.danger ?? null;
-  const crisis: CrisisLine[] = kind ? CRISIS_LINES : [];
+  // Safety: fixed patterns first, then the model's safety question, then its danger field.
+  const kind = crisisKind(last) ?? (modelUp && last ? await safetyCheck(last) : null) ?? q.danger ?? null;
   const lang0 = q.language && !/english/i.test(q.language) ? q.language : '';
+  // Crisis words in Spanish are fixed text, never the model's translation.
+  const spanish = Boolean(kind) && (/^es\b|spanish|espa[nñ]ol/i.test(lang0) || isSpanishCrisis(last));
+  const box = crisisBox(kind, spanish);
+  const safety = safetyMessage(kind, spanish);
+  const safetyWords = spanish ? safety : await translateTo(lang0, safety);
   const allUser = history.filter(m => m.role === 'user').map(m => m.content).join(' ');
   const immigration = aboutImmigration(last) || (last && q.immigration) || (aboutImmigration(allUser) && !q.type);
 
@@ -265,7 +294,7 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
     const city = q.city.replace(/\b\w/g, c => c.toUpperCase());
     const options = where.choices.map(s => `${city}, ${STATE_NAMES[s] ?? s}`);
     const ask = `Which state is that? For example, ${options.slice(0, -1).join(', ')} or ${options.at(-1)}.`;
-    return { reply: await translateTo(lang0, [safetyMessage(kind), ask].filter(Boolean).join(' ')), results: [], alerts: [], crisis, state };
+    return { reply: [safetyWords, await translateTo(lang0, ask)].filter(Boolean).join(' '), results: [], alerts: [], ...box, state };
   }
   q.state = where.state;
   const hasPlace = Boolean(q.zip || q.city);
@@ -280,12 +309,11 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
     const local = hasPlace ? all.filter(l => localRe.test(`${l.name} ${l.details}`)
       && ((q.zip && l.zip.slice(0, 3) === q.zip.slice(0, 3)) || (q.city && l.city.toLowerCase() === q.city))).slice(0, 5) : [];
     const parts = [
-      safetyMessage(kind),
       "I'm so sorry. Being targeted, or having someone you love taken, is frightening. Here are organizations that can help. I don't save anything you tell me.",
       pets ? 'If a pet was left behind, local animal shelters or humane societies may be able to help with temporary care.' : '',
       hasPlace ? '' : "If you tell me your city or state, I can show local help too.",
     ].filter(Boolean).join(' ');
-    return { reply: await translateTo(lang0, parts), resources, results: local, alerts: [], crisis, state };
+    return { reply: [safetyWords, await translateTo(lang0, parts)].filter(Boolean).join(' '), resources, results: local, alerts: [], ...box, state };
   }
 
   // 3. Search (facts come only from here).
@@ -341,7 +369,7 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
   let choices: Choice[] | undefined;
   if (kind === 'suicide') {
     question = 'Would you like to talk with someone, or would you like help finding shelter, food, or something else? Either is okay.';
-    choices = TALK_CHOICES;
+    choices = spanish ? TALK_CHOICES_ES : TALK_CHOICES;
     if (askedLocation) state.locationAsks--;   // the talk-or-help question replaced the location question
   }
 
@@ -352,7 +380,6 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
       ? "I'm sorry you're hungry. I can help you find food."
       : `I can help you find ${need}.`;
   }
-  const safety = safetyMessage(kind);
 
   // 5. Write it: the model's empathy line (if any), with a fixed fallback.
   const lang = q.language && !/english/i.test(q.language) ? q.language : '';
@@ -380,6 +407,6 @@ Reply in the same language as the person's last message, which was: "${last.slic
   };
   // Order: safety first, then the caring words, then the one question.
   // The small model sometimes answers in English anyway, so non-English replies are translated as a whole.
-  const reply = [await translate(safety), await translate(caring.trim()), await translate([statement, bridge, question].filter(Boolean).join(' '))].filter(Boolean).join(' ');
-  return { reply, results, alerts, crisis, choices, resources: disasterResources, state };
+  const reply = [safetyWords, await translate(caring.trim()), await translate([statement, bridge, question].filter(Boolean).join(' '))].filter(Boolean).join(' ');
+  return { reply, results, alerts, ...box, choices, resources: disasterResources, state };
 }

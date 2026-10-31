@@ -12,7 +12,8 @@
   header { background:var(--purple); color:#fff; padding:14px 16px; }
   header h1 { margin:0; font-size:20px; }
   header p { margin:4px 0 0; font-size:14px; opacity:.9; }
-  main { max-width:680px; margin:0 auto; padding:12px 16px 120px; }
+  main { max-width:680px; margin:0 auto; padding:12px 16px 220px; }
+  main > * { scroll-margin-bottom:210px; }   /* so the fixed bar never covers the newest message */
   .msg { margin:12px 0; padding:12px 14px; border-radius:14px; max-width:92%; white-space:pre-wrap; }
   .me { background:var(--purple); color:#fff; margin-left:auto; border-bottom-right-radius:4px; }
   .bot { background:var(--purple-soft); border-bottom-left-radius:4px; }
@@ -28,7 +29,9 @@
   .crisis a { font-weight:700; color:inherit; }
   .fb { display:flex; gap:8px; align-items:center; font-size:14px; color:var(--muted); margin:4px 0 12px; }
   .fb button { padding:4px 12px; min-height:36px; font-size:18px; }
-  form { position:fixed; left:0; right:0; bottom:0; background:var(--bg); border-top:1px solid var(--line); padding:10px 16px; display:flex; gap:8px; justify-content:center; }
+  form { position:fixed; left:0; right:0; bottom:0; background:var(--bg); border-top:1px solid var(--line); padding:10px 16px; display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+  .help { flex-basis:100%; margin:0; text-align:center; font-size:14px; line-height:1.4; }
+  .help a { color:inherit; font-weight:700; }
   input { flex:1; max-width:560px; font:inherit; padding:12px 14px; border-radius:12px; border:2px solid var(--line); background:var(--bg); color:var(--ink); min-width:0; }
   form button { font:inherit; padding:12px 16px; border-radius:12px; border:0; background:var(--purple); color:#fff; font-weight:600; }
   .small { font-size:14px; color:var(--muted); }
@@ -52,6 +55,8 @@
 </header>
 <main id="chat" aria-live="polite"></main>
 <form id="f">
+  <!-- Always on screen: no word list or model catches every crisis. Spanish steps are from 988lifeline.org. -->
+  <p class="help">Free help, 24 hours a day: <a href="tel:988">call</a> or <a href="sms:988">text 988</a>. Emergency: <a href="tel:911">911</a>. Domestic violence: <a href="tel:18007997233">1-800-799-7233</a>. <span lang="es">En español: <a href="tel:988">marca 988 y presiona 2</a>.</span></p>
   <div style="flex:1;max-width:560px;display:flex;flex-direction:column;gap:4px">
     <input id="q" autocomplete="off" placeholder="Type here, in any language" aria-label="Your message">
     <span class="small"><button id="loc" type="button">Use my location</button> (optional, turned into a general area, never saved)</span>
@@ -114,7 +119,7 @@ async function send(text) {
     if (d.error) throw new Error(d.error);
     convoState = d.state;
     if (d.crisis.length) {
-      const box = el('div', 'crisis'); box.append(el('strong', null, 'Free help, 24 hours a day:'));
+      const box = el('div', 'crisis'); box.append(el('strong', null, d.crisisTitle || 'Free help, 24 hours a day:'));
       for (const c of d.crisis) { const p = el('div'); p.append(c.name + ': ', c.how); box.append(p); }
       chat.append(box);
     }

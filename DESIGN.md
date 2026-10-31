@@ -16,10 +16,10 @@ The end user is a person experiencing homelessness, often on a prepaid phone, of
 ShelterApp has no budget for AI. Mandy has to run all day, every day, for anyone who needs her, without a bill that grows with every conversation. Manda learned this firsthand: running her own tools on paid AI used up tokens fast, so she moved her daily tools to a free model on her own computer. Mandy follows the same thinking.
 
 - **A small, free model, not a big paid one.** Paid AI charges for every word it reads and writes. A few cents per conversation sounds small, but thousands of conversations a day becomes real money that ShelterApp doesn't have. A small model (Gemma 4 E2B, run free with Ollama) costs nothing per message.
-- **The AI does as little as possible.** It does two small jobs: understand the message, and write one caring sentence when someone shares something hard. Everything else is plain code, which is free, instant, and always the same.
+- **The AI does as little as possible.** It does three small jobs: understand the message, check it for signs of danger, and write one caring sentence when someone shares something hard. Everything else is plain code, which is free, instant, and always the same.
 - **Fixed text for anything that matters.** Questions, next steps, crisis lines and the dignity note are written once by people and reused. That costs nothing, can't go wrong, and keeps the wording Manda chose.
 - **Facts come from the database, not the AI.** Listings, hours and phone numbers are looked up, not generated. That's cheaper and it's the only way to be accurate.
-- **Fewer AI calls per message.** Safety checks, abuse and off-topic replies, location lookups, disaster alerts, and translations for English speakers all skip the AI.
+- **Fewer AI calls per message.** Crisis phrases on the fixed list, abuse and off-topic replies, location lookups, disaster alerts, and translations for English speakers all skip the AI.
 - **Free public data only.** Disaster alerts come from FEMA and the National Weather Service; places are found with OpenStreetMap. No paid keys anywhere.
 - **No data stored.** Nothing to store means no database to pay for, nothing to protect, and nothing that could be handed over about the people who use Mandy.
 - **Easy to upgrade later.** The model is chosen by three settings in `.env`. If funding comes, ShelterApp can switch to a larger hosted model (including free tiers like Cloudflare Workers AI) without changing any code.

@@ -67,9 +67,13 @@ Every resource lists its source and the date it was checked. Hotlines change: re
 
 ## 3. Safety
 
-- If a message suggests danger, self-harm, abuse, or overdose, crisis lines show first (fixed code, not AI). Two nets catch it: fixed phrases ("might as well be dead", "better off dead", "what's the point anymore", "don't want to wake up"...) and the AI's own danger check, which also works in other languages.
+- 988, 911, the domestic violence hotline, and the Spanish way to reach 988 stay on screen at all times, because no net catches every crisis.
+- If a message suggests danger, self-harm, abuse, or overdose, crisis lines show first (fixed code, not AI). Two nets catch it: fixed phrases in English and Spanish, with or without accents ("might as well be dead", "better off dead", "what's the point anymore", "don't want to wake up", "no quiero vivir"...) and a separate safety question to the AI on every message, which also works in other languages. The phrases follow the warning signs on 988lifeline.org.
+- Neither net is enough alone, which is why the numbers stay on screen. In tests on made-up messages never used to build them (October 31, 2026), both nets together caught 10 of 12 crisis messages. The fixed phrases alone had caught 2 of 16, and the AI question alone 13 of 16. The AI question also adds a crisis box to some everyday messages (6 of 24 alone, 1 of 15 with everything in place). Those false alarms get the gentle safety line, never the words about ending your life, and the person still gets what they asked for. Made-up messages are not real conversations: treat these numbers as a rough guide, not proof.
 - When someone hints at not wanting to live, Mandy's first words are fixed: "I'm really glad you told me. You matter. If you're thinking about ending your life, you can call or text 988 right now. It's free and open 24 hours a day." Then she keeps offering help; she never ends the conversation.
-- Before launch, the crisis wording should be reviewed against safe messaging guidelines (988 Lifeline) and by people with frontline expertise.
+- When someone else threatens them ("he said he'll kill me"), Mandy's first words are the safety message, "You deserve to be safe...", not the message about ending their life.
+- Spanish crisis wording is fixed text too, not an AI translation.
+- Before launch, the crisis wording, the fixed phrases, and the Spanish text should be reviewed against safe messaging guidelines (988 Lifeline) and by people with frontline expertise, including native Spanish speakers.
 - A **Quick exit** button clears the chat and leaves the page at once.
 - The bot never asks for a name, phone number, birth date, ID, or immigration status.
 - It never asks why someone is homeless.
