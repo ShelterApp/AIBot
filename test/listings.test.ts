@@ -45,6 +45,17 @@ test('search: nearest first, never far away, 24/7 first at night', () => {
   assert.equal(searchListings(all, { type: 'shelter', city: 'seattle', who: 'men' }).length, 1); // women-only excluded
 });
 
+test('an address never repeats the city or shows a web link', () => {
+  const f = join(dir, 'address.json');
+  writeFileSync(f, JSON.stringify([
+    { name: 'Orange Clinic', address_full: '2420 S Orange Ave, Orlando, FL 32806, Orlando, FL, 32806', city: 'Orlando', state: 'FL', zip: '32806', services: 'HEALTH', approval: 'Approved' },
+    { name: 'Online Help', address1: 'https://www.example.org/seattle', city: 'Seattle', state: 'WA', zip: '98126', services: 'HEALTH', approval: 'Approved' },
+  ]));
+  const [a, b] = loadListings(f);
+  assert.equal(a.address, '2420 S Orange Ave');
+  assert.equal(b.address, '');
+});
+
 test('addresses with a suite keep their state, and street numbers never become ZIPs', () => {
   const f = join(dir, 'suite.json');
   writeFileSync(f, JSON.stringify([

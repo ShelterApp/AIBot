@@ -42,15 +42,22 @@ const all = [
   L('Portland OR Beds', 'Portland', 'OR', '97202', ['SHELTER']),
 ];
 
+const seattle = [
+  ...[1, 2, 3, 4, 5, 6, 7].map(n => L(`Pantry ${n}`, 'Seattle', 'WA', '98118', ['FOOD'])),
+  { ...L('Recovery Place', 'Seattle', 'WA', '98144', ['HEALTH']), details: 'MEDICAL DETOX with access to primary care', hours: 'Open 24/7' },
+  { ...L('Talkspace Seattle', 'Seattle', 'WA', '98126', ['HEALTH']), details: 'Free online mental/behavioral health, counseling', hours: 'Open 24/7' },
+  { ...L('Seattle Roots Community Health', 'Seattle', 'WA', '98112', ['HEALTH']), details: 'primary care and acute illness care' },
+];
+
 // Plays turns the way the page does: the whole history, plus the state it was handed back.
-async function play(turns: [string, Record<string, unknown>][]) {
+async function play(turns: [string, Record<string, unknown>][], listings: typeof all = all) {
   const history: { role: 'user' | 'assistant'; content: string }[] = [];
   let state: any = { locationAsks: 0 };
   const replies = [];
   for (const [text, model] of turns) {
     understood = model;
     history.push({ role: 'user', content: text });
-    const r = await respond(all, history, { state });
+    const r = await respond(listings, history, { state });
     state = r.state;
     history.push({ role: 'assistant', content: r.reply });
     replies.push(r);
@@ -70,6 +77,115 @@ test('remembers what they asked for: the conversation that first showed this', a
   assert.equal(r[3].state.need, 'shelter');
   assert.match(r[3].reply, /Whenever you can tell me a city/);
   assert.doesNotMatch(r[3].reply, /Thank you for telling me|really hard/);
+});
+
+test('never the same list twice: the test that showed this, with the model\'s real answers', async () => {
+  const r = await play([
+    ['I need help', { intent: 'need_help' }],
+    ["I am thirsty and it's late at night", { type: 'food', intent: 'need_help', language: 'English' }],
+    ['I am in Seattle', { type: 'food', language: 'English' }],
+    ['Those are not open', { type: 'food', language: 'English' }],
+    ['Can you  get me a friend', { type: 'wants_to_talk', language: 'English' }],
+    ['i need a hostpital', { type: 'health', city: 'Seattle', intent: 'need_help', language: 'English' }],
+    ['You are stupid', { type: 'health', language: 'English' }],
+  ], seattle);
+
+  assert.match(r[1].reply, /^I'm sorry you're thirsty\. I can help you find water and food\. What city are you in\?/);
+  assert.equal(r[2].results.length, 5);
+
+  assert.match(r[3].reply, /^I'm sorry those didn't work out\. Here are some other places for food\./);
+  assert.deepEqual(r[3].results.map(l => l.name), ['Pantry 6', 'Pantry 7']);
+
+  assert.match(r[4].reply, /I'm an automated helper/);
+  assert.ok(r[4].choices?.some(c => c.url?.includes('988')));
+  assert.equal(r[4].results.length, 0);
+
+  assert.match(r[5].reply, /^If this is an emergency, call 911\. I don't have many hospitals listed, so here are places for health care near you\./);
+  assert.equal(r[5].results[0]?.name, 'Seattle Roots Community Health');
+  assert.ok(!r[5].results.some(l => /detox|online/i.test(l.details)));
+
+  assert.equal(r[6].note, 'ShelterApp believes in treating all beings with dignity and respect.');
+  assert.match(r[6].reply, /help finding shelter, food, or other resources/);
+  assert.equal(r[6].results.length, 0);
+});
+
+test('wanting company beats the model\'s guess at a service', async () => {
+  const r = await play([['I need food in Seattle', { type: 'food', city: 'Seattle' }], ['Can you  get me a friend', { type: 'work', language: 'English' }]], seattle);
+  assert.match(r[1].reply, /I'm an automated helper/);
+  assert.equal(r[1].results.length, 0);
+});
+
+test('hospitals are understood however they are typed', async () => {
+  for (const said of ['i need a hospital', 'i need a hostpital', 'i need a hostipal', 'i need a hopital', 'i need a hospitol', 'where is the nearest ER', 'take me to the er', 'I need an emergency room', 'call an ambulance']) {
+    const [r] = await play([[said, {}]]);
+    assert.match(r.reply, /^If this is an emergency, call 911\./, said);
+  }
+});
+
+test('words that only look like a hospital do not trigger it', async () => {
+  for (const said of ['I need a shower', 'where is the hotel', 'I need water']) {
+    const [r] = await play([[said, {}]]);
+    assert.doesNotMatch(r.reply, /call 911/, said);
+  }
+});
+
+test('a one-word insult gets the dignity note, even after a list', async () => {
+  const r = await play([['I need food in Seattle', { type: 'food', city: 'Seattle' }], ['idiot', { type: 'food' }]], seattle);
+  assert.equal(r[1].note, 'ShelterApp believes in treating all beings with dignity and respect.');
+});
+
+test('asking for more shows the next places, then says when there are no more', async () => {
+  const r = await play([
+    ['I need food in Seattle', { type: 'food', city: 'Seattle' }],
+    ['any others?', { type: 'food', city: 'Seattle' }],
+    ['those are closed', { type: 'food', city: 'Seattle' }],
+  ], seattle);
+  assert.match(r[1].reply, /^Here are some other places for food\./);
+  assert.equal(r[1].results.length, 2);
+  assert.match(r[2].reply, /^I'm sorry those didn't work out\. Those are all the food listings I have near there\. If you tell me a nearby city, I can look there too\./);
+  assert.equal(r[2].results.length, 0);
+});
+
+test('a message that asks for nothing new gets a question, not the list again', async () => {
+  const r = await play([
+    ['I need food in Seattle', { type: 'food', city: 'Seattle' }],
+    ['thanks', { type: 'food', city: 'Seattle' }],
+    ['What is the capital of France?', { type: 'food' }],
+  ], seattle);
+  for (const turn of r.slice(1)) {
+    assert.equal(turn.reply, 'What else can I help you find?');
+    assert.equal(turn.results.length, 0);
+  }
+});
+
+test('a new city or a street starts a fresh search', async () => {
+  const both = [...seattle, ...all];
+  const city = await play([['I need food in Seattle', { type: 'food', city: 'Seattle' }], ['what about Tacoma', { type: 'food', city: 'Tacoma' }]], both);
+  assert.equal(city[1].results[0]?.name, 'Tacoma Pantry');
+  landing = { postcode: '98118', city: 'Seattle', state: 'Washington' };
+  const street = await play([['I need food in Seattle', { type: 'food', city: 'Seattle' }], ['Rainier and Othello', { type: 'food', city: 'Seattle', place: 'Rainier and Othello' }]], seattle);
+  assert.equal(street[1].results.length, 5);
+});
+
+test('someone asking for help while swearing gets the help', async () => {
+  const r = await play([['I need shelter', { type: 'shelter' }], ['fuck you I need food in Seattle', { type: 'food', city: 'Seattle' }]], seattle);
+  assert.equal(r[1].note, undefined);
+  assert.equal(r[1].results.length, 5);
+});
+
+test('a city is never treated as off-topic once they have asked for something', async () => {
+  const r = await play([['I need food', { type: 'food' }], ['Seattle', { type: 'food', intent: 'off_topic' }]], seattle);
+  assert.equal(r[1].results.length, 5);
+});
+
+test('off-topic with nothing asked for still gets the fixed redirect', async () => {
+  const [r] = await play([['tell me a joke', { intent: 'off_topic' }]]);
+  assert.match(r.reply, /^I'm only able to help find resources/);
+});
+
+test('a hospital request names 911 even before we know the city', async () => {
+  const [r] = await play([['i need a hospital', { type: 'health' }]]);
+  assert.match(r.reply, /^If this is an emergency, call 911\. .*What city are you in\?/);
 });
 
 test('someone who only says they are homeless is still asked, not assumed', async () => {

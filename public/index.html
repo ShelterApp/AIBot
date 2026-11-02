@@ -102,7 +102,7 @@ function card(l) {
   c.append(el('div', 'row', 'Hours: ' + l.hours));
   if (l.details) c.append(el('div', 'row', l.details));
   const who = l.who.filter(w => w !== 'ALL');
-  if (who.length && who.length < 7) c.append(el('div', 'row', 'Serves: ' + who.join(', ').toLowerCase()));
+  if (who.length && who.length < 7) c.append(el('div', 'row', 'Serves: ' + who.join(', ').toLowerCase().replace(/_/g, ' ')));
   if (l.website) { const r = el('div', 'row'); r.append(link(l.website, 'Website')); c.append(r); }
   return c;
 }

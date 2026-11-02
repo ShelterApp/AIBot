@@ -59,6 +59,13 @@ export function fromAddress(full: string): { address1: string; city: string; sta
   return m ? { address1: m[1].trim(), city: m[2].trim(), state: m[3].toUpperCase(), zip: m[4] } : null;
 }
 
+// The street line only: no "." placeholders, no web links, and no repeat of the city.
+export function streetOnly(address: string, city: string): string {
+  if (!/[a-z0-9]/i.test(address) || /^(https?:|www\.)/i.test(address.trim())) return '';
+  const at = city ? address.toLowerCase().indexOf(`, ${city.toLowerCase()}`) : -1;
+  return at > 0 ? address.slice(0, at) : address;
+}
+
 // Reads either an audit-tool inventory export (real listings) or the small demo file.
 // Only approved listings are used, and staff fields like `added_by` are dropped.
 export function loadListings(path: string): Listing[] {
@@ -69,7 +76,7 @@ export function loadListings(path: string): Listing[] {
     .map(r => ({ ...r, ...fromAddress(String(r.address_full ?? '')) }))
     .map(r => ({
       name: String(r.name ?? ''),
-      address: /[a-z0-9]/i.test(String(r.address1 ?? '')) ? String(r.address1) : '',   // drop "." placeholders
+      address: streetOnly(String(r.address1 ?? ''), String(r.city ?? '')),
       city: String(r.city ?? ''),
       state: String(r.state ?? '').toUpperCase(),
       zip: String(r.zip ?? '').slice(0, 5),

@@ -9,9 +9,10 @@ import { crisisKind, crisisBox, isSpanishCrisis, safetyMessage, type CrisisKind,
 import { placeToArea, coordsToArea } from './geo.ts';
 import { specialResources, aboutImmigration, aboutPets, type SpecialResource } from './special.ts';
 
-// Not personal data: how many times we've asked about location, and the kind of help
-// asked for ("shelter", "food"), echoed back by the browser so the server stays stateless.
-export interface ConvoState { locationAsks: number; need?: string }
+// Not personal data: how many times we've asked about location, the kind of help asked
+// for ("shelter", "food"), and how many places we've shown, echoed back by the browser
+// so the server stays stateless.
+export interface ConvoState { locationAsks: number; need?: string; shown?: number }
 
 export interface Context {
   state?: ConvoState;
@@ -115,8 +116,8 @@ function keywordSearch(text: string) {
   const t = text.toLowerCase();
   const map: [RegExp, string][] = [
     // Whole words only: "Seattle" contains "eat", "Bedford" contains "bed".
-    [/\b(sleep\w*|beds?|shelters?|housing|stay|tonight)\b/, 'shelter'], [/\b(food|eat\w*|meals?|hungry|pantry|pantries)\b/, 'food'],
-    [/\b(doctors?|clinics?|health|medic\w*|dentist)\b/, 'health'], [/\b(jobs?|work\w*)\b/, 'work'],
+    [/\b(sleep\w*|beds?|shelters?|housing|stay|tonight)\b/, 'shelter'], [/\b(food|eat\w*|meals?|hungry|thirst\w*|pantry|pantries)\b/, 'food'],
+    [/\b(doctors?|clinics?|health|medic\w*|dentist)\b/, 'health'], [HOSPITAL, 'health'], [/\b(jobs?|work\w*)\b/, 'work'],
     [/\b(shower\w*|laundry|clothes|phone|mail|id)\b/, 'resources'],
   ];
   return {
@@ -143,7 +144,7 @@ function clean(raw: any) {
     keywords: pick(raw?.keywords),
     shared_situation: raw?.shared_situation === true,
     feeling: pick(raw?.feeling, FEELINGS),
-    intent: pick(raw?.intent, INTENTS),
+    intent: pick(raw?.intent, INTENTS) ?? pick(raw?.type, INTENTS),   // the model sometimes puts it in "type"
     immigration: raw?.immigration === true,
     danger: pick(raw?.danger, ['suicide', 'danger']) as 'suicide' | 'danger' | undefined,
     language: typeof raw?.language === 'string' ? raw.language : undefined,
@@ -220,7 +221,22 @@ ${text}` }], { maxTokens: 160 }) || text;
 }
 
 // Backstop for abuse aimed at Mandy, in case the model misses it.
-const ABUSE = /\b(?:(?:fuck|screw) (?:you|off)|you(?:'?re| are) (?:so )?(?:stupid|useless|dumb|an idiot|worthless|a bitch)|(?:stupid|dumb|useless) (?:bot|ai|robot|app))\b/i;
+const ABUSE = /\b(?:(?:fuck|screw) (?:you|off)|you(?:'?re| are) (?:so )?(?:stupid|useless|dumb|an idiot|worthless|a bitch)|(?:stupid|dumb|useless) (?:bot|ai|robot|app))\b|^\W*(?:idiot|moron|stupid|dumbass|loser|bitch)\W*$/i;
+
+// Backstop for wanting company, not a service.
+const WANTS_TO_TALK = /\b(?:(?:need|want|get me|have no|got no) (?:a )?friends?|no friends|someone to talk to|(?:talk|speak) (?:to|with) (?:someone|somebody|you|a person)|lonely)\b/i;
+
+// After a list: those places didn't work out, or they'd like to see more.
+const NOT_WORKING = /\b(?:not open|isn'?t open|aren'?t open|closed|shut down|not there|(?:doesn'?t|didn'?t|don'?t|won'?t) work|not working|turned (?:me|us) away|(?:is|are|was|were) full|no answer|(?:nobody|no one) answered|wrong number|too far|none of (?:those|these|them)|not (?:helpful|useful)|no est[aá]n? abiert[oa]s?|cerrad[oa]s?)\b/i;
+const MORE = /\b(?:more|another|others?|anything else|different|next|otr[oa]s?|m[aá]s opciones)\b/i;
+
+// ShelterApp lists few hospitals, so medical care goes ahead of detox, counseling, and online help.
+const HOSPITAL = /\bhos?t?i?p[ia]?t?[ao]l\w*|\bemergency room\b|\bambulance\b|\b(?:the|an|nearest|closest) er\b/i;   // catches typos like "hostipal"
+const medicalFirst = (list: Listing[]) => {
+  const fits = list.filter(l => /hospital|medical cent/i.test(l.name)
+    || (/hospital|urgent care|primary care|walk-in|clinic/i.test(`${l.name} ${l.details}`) && !/detox|counsel|behavioral|therapy|recovery|online/i.test(`${l.name} ${l.details}`)));
+  return fits.length ? fits : list;
+};
 
 const NEED_WORDS: Record<string, string> = { shelter: 'shelter', food: 'food', health: 'health care', resources: 'showers and other help', work: 'work' };
 
@@ -228,7 +244,11 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
   const last = history.filter(m => m.role === 'user').at(-1)?.content ?? '';
   const convo = history.slice(-8).map(m => `${m.role === 'user' ? 'Person' : 'Helper'}: ${m.content}`).join('\n');
   const remembered = TYPES.includes(ctx.state?.need ?? '') ? ctx.state?.need : undefined;
-  const state: ConvoState = { locationAsks: Math.max(0, Math.min(10, Number(ctx.state?.locationAsks) || 0)), ...(remembered ? { need: remembered } : {}) };
+  const state: ConvoState = {
+    locationAsks: Math.max(0, Math.min(10, Number(ctx.state?.locationAsks) || 0)),
+    shown: Math.max(0, Math.min(1000, Number(ctx.state?.shown) || 0)),
+    ...(remembered ? { need: remembered } : {}),
+  };
 
   // 1. Understand the message.
   let q: ReturnType<typeof clean>;
@@ -260,14 +280,16 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
   const immigration = aboutImmigration(last) || (last && q.immigration) || (aboutImmigration(allUser) && !q.type);
 
   // Human behavior as it is: some messages aren't looking for a service. Safety always
-  // comes first, and someone asking for help is never treated as abuse.
-  if (!kind && !q.type && !immigration) {
-    const intent = ABUSE.test(last) ? 'abuse' : q.intent;
+  // comes first, and someone asking for help is never treated as abuse. The model repeats
+  // the need from earlier in the conversation, so only a new one counts as asking now.
+  const askingNow = Boolean(keywordSearch(last).type) || Boolean(q.type && q.type !== remembered && !ABUSE.test(last) && !WANTS_TO_TALK.test(last));
+  if (!kind && !askingNow && !immigration) {
+    const intent = ABUSE.test(last) ? 'abuse' : WANTS_TO_TALK.test(last) ? 'wants_to_talk' : q.intent;
     if (intent === 'abuse') {
       return { reply: await translateTo(lang0, "I'm here if you need help finding shelter, food, or other resources."),
         note: await translateTo(lang0, DIGNITY_NOTE), results: [], alerts: [], crisis: [], state };
     }
-    if (intent === 'off_topic') {
+    if (intent === 'off_topic' && !remembered) {
       return { reply: await translateTo(lang0, "I'm only able to help find resources like shelter, food, and health care. What can I help you find?"),
         results: [], alerts: [], crisis: [], state };
     }
@@ -287,7 +309,7 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
   // Someone who only says "I'm homeless" hasn't asked for anything yet: ask, don't assume.
   const asked = history.filter(m => m.role === 'user').map(m => m.content).join(' ');
   if (q.shared_situation && !state.need && (!q.language || /english/i.test(q.language))
-      && !/shelter|housing|bed|sleep|stay|food|eat|hungry|meal|doctor|clinic|health|shower|laundry|job|work/i.test(asked)) {
+      && !/shelter|housing|bed|sleep|stay|food|eat|hungry|thirst|meal|doctor|clinic|hospital|health|shower|laundry|job|work/i.test(asked)) {
     q.type = undefined;
   }
   // What they already asked for still stands, in any language, until they ask for something else.
@@ -340,12 +362,21 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
     return { reply: [safetyWords, await translateTo(lang0, parts)].filter(Boolean).join(' '), resources, results: local, alerts: [], ...box, state };
   }
 
-  // 3. Search (facts come only from here).
-  const results = hasPlace && q.type ? searchListings(all, { ...q, night }) : [];
-  const alerts = hasPlace ? await alertsFor(q.state) : [];
+  // 3. Search (facts come only from here). A follow-up to the same search never repeats the
+  //    list: it shows the next places, or asks what else they need.
+  const hospital = HOSPITAL.test(last);
+  const said = last.toLowerCase();
+  const newPlace = Boolean(ctx.coords) || [q.city, q.zip, q.place].some(p => p && said.includes(p)) || Boolean(findStateInText(last));
+  const followUp = hasPlace && Boolean(state.shown) && q.type === remembered && !hospital && !newPlace;
+  const wantsMore = followUp && (NOT_WORKING.test(last) || MORE.test(last) || Boolean(keywordSearch(last).type));
+  const pool = hasPlace && q.type ? searchListings(all, { ...q, night }, 100) : [];
+  const already = followUp ? state.shown ?? 0 : 0;
+  const results = followUp && !wantsMore ? [] : (hospital ? medicalFirst(pool) : pool).slice(already, already + 5);
+  state.shown = already + results.length;
+  const alerts = hasPlace && !followUp ? await alertsFor(q.state) : [];
   // Emergency shelters when there's a disaster: FEMA's live list (pet-friendly first if they
   // have pets), and always the Red Cross map, since counties often report late.
-  const disaster = hasPlace && q.type === 'shelter' && (emergency || alerts.length > 0);
+  const disaster = hasPlace && !followUp && q.type === 'shelter' && (emergency || alerts.length > 0);
   const emergencyShelters = disaster ? await openShelters(q.state, aboutPets(allUser)) : [];
   const disasterResources = disaster ? [...emergencyShelters, ...DISASTER_HELP] : undefined;
 
@@ -373,8 +404,17 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
     question = state.locationAsks === 1
       ? "What city are you in? If you know a street, a cross street, or a place nearby, like a store or bus stop, that helps too. I don't save it."
       : `Is there a street name or a place you can see nearby, like a store, library, church, or bus stop? You can also tap "Use my location". It's never saved.`;
+  } else if (followUp && !wantsMore) {
+    question = 'What else can I help you find?';
+  } else if (wantsMore) {
+    const sorry = NOT_WORKING.test(last) ? "I'm sorry those didn't work out. " : '';
+    statement = results.length
+      ? `${sorry}Here are some other places for ${need}. Please call ahead, since hours and space can change.`
+      : `${sorry}Those are all the ${need} listings I have near there. If you tell me a nearby city, I can look there too.`;
   } else if (results.length) {
-    statement = `Here are places for ${need} near you. Please call ahead, since hours and space can change.`;
+    statement = hospital
+      ? `I don't have many hospitals listed, so here are places for ${need} near you. Please call ahead, since hours and space can change.`
+      : `Here are places for ${need} near you. Please call ahead, since hours and space can change.`;
     if (alerts.length) statement += ' There are also official emergency alerts for your state above.';
     if (!q.zip) question = "If you tell me a street or a place nearby, I can show what's closest.";
   } else if (disaster) {
@@ -402,8 +442,11 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
   if (q.type && !hasPlace && !empathy && askedLocation && state.locationAsks === 1) {
     bridge = q.type === 'food' && /hungry|starving|haven'?t eaten|no food/i.test(last)
       ? "I'm sorry you're hungry. I can help you find food."
-      : `I can help you find ${need}.`;
+      : q.type === 'food' && /thirst/i.test(last)
+        ? "I'm sorry you're thirsty. I can help you find water and food."
+        : `I can help you find ${need}.`;
   }
+  const urgent = hospital ? 'If this is an emergency, call 911.' : '';
 
   // 5. Write it: the model's empathy line (if any), with a fixed fallback.
   const lang = q.language && !/english/i.test(q.language) ? q.language : '';
@@ -432,6 +475,6 @@ Reply in the same language as the person's last message, which was: "${last.slic
   };
   // Order: safety first, then the caring words, then the one question.
   // The small model sometimes answers in English anyway, so non-English replies are translated as a whole.
-  const reply = [safetyWords, await translate(caring.trim()), await translate([statement, bridge, question].filter(Boolean).join(' '))].filter(Boolean).join(' ');
+  const reply = [safetyWords, await translate(urgent), await translate(caring.trim()), await translate([statement, bridge, question].filter(Boolean).join(' '))].filter(Boolean).join(' ');
   return { reply, results, alerts, ...box, choices, resources: disasterResources, state };
 }
