@@ -161,7 +161,7 @@ async function send(text) {
     wait.remove();
     // Opened as a file instead of from the server: say so plainly instead of failing silently.
     const hint = location.protocol === 'file:' ? ' (Test note: open http://localhost:8787 instead of the file.)' : '';
-    chat.append(el('div', 'msg bot', 'Sorry, something went wrong. Please try again, or call or text 211.' + hint));
+    chat.append(el('div', 'msg bot', 'Sorry, something went wrong. Please try again.' + hint));
   }
   chat.lastElementChild.scrollIntoView({ block: 'end' });
 }

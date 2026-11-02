@@ -100,6 +100,24 @@ test('the model\'s own offer never clashes with the next step', async () => {
   assert.match(r.reply, /^Thank you for telling me\. Not having a place to go is really hard\. Are you looking for shelter/);
 });
 
+test('an evacuation gets disaster help even if the model files it under "resources"', async () => {
+  const [r] = await play([['There is a wildfire near me in Tacoma and I need to leave with my dog', { type: 'resources', city: 'Tacoma' }]]);
+  assert.equal(r.state.need, 'shelter');
+  assert.ok(r.resources?.some(x => x.url?.includes('redcross.org')));
+  assert.match(r.reply, /Red Cross map below/);
+});
+
+test('someone in a disaster who asks for showers still gets showers', async () => {
+  const [r] = await play([['the flood took everything, I need a shower in Tacoma', { type: 'resources', city: 'Tacoma' }]]);
+  assert.equal(r.state.need, 'resources');
+});
+
+test('a phone number from the model never reaches the person', async () => {
+  caring = 'That sounds really hard. You can call 211 for help.';
+  const [r] = await play([['I am homeless', { shared_situation: true, language: 'English' }]]);
+  assert.match(r.reply, /^That sounds really hard\. Are you looking for shelter/);
+});
+
 test('if the model only wrote an offer, the fixed caring line is used', async () => {
   caring = 'We can look for shelter options for you.';
   const [r] = await play([['I am homeless', { shared_situation: true, language: 'English' }]]);

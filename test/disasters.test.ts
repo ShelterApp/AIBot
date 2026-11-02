@@ -21,7 +21,10 @@ test('pet-friendly shelters come first when the person has pets', () => {
   assert.doesNotMatch(list[1].what, /Accepts pets/);
 });
 
-test('the Red Cross map and 211 are always there as a fallback', () => {
+test('the Red Cross map is always there as a fallback', () => {
   assert.ok(DISASTER_HELP.some(r => r.url?.includes('redcross.org')));
-  assert.ok(DISASTER_HELP.some(r => r.phone === '211'));
+});
+
+test('shelter cards point to the Red Cross map to confirm', () => {
+  assert.match(toShelters([rec('Bay Center', 'OPEN', null)])[0].what, /check the Red Cross map/);
 });

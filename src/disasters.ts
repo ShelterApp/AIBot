@@ -53,7 +53,7 @@ async function weather(state: string): Promise<Alert[]> {
 // ------------------------------------------------------------- emergency shelters
 // FEMA's Open Shelters feed (Red Cross and partners report into it). Free, no key, and it
 // says which shelters take pets. Counties often report late, so when it's empty we say so
-// and give the places that always know: the Red Cross shelter finder and 211.
+// and give the Red Cross shelter finder, which often has them first.
 
 const SHELTERS_URL = 'https://gis.fema.gov/arcgis/rest/services/NSS/OpenShelters/FeatureServer/0/query';
 const shelterCache = new Map<string, { at: number; list: SpecialResource[] }>();
@@ -63,9 +63,6 @@ export const DISASTER_HELP: SpecialResource[] = [
     what: 'Map of emergency shelters open right now. Many counties list shelters here before anywhere else.',
     url: 'https://www.redcross.org/get-help/disaster-relief-and-recovery-services/find-an-open-shelter.html',
     source: 'redcross.org', verified: '2026-10-08' },
-  { category: 'disaster', area: 'US', name: '211',
-    what: 'Call or text 211 to ask which shelters near you are open, including ones that take pets.',
-    phone: '211', url: 'https://www.211.org', source: '211.org', verified: '2026-10-08' },
   { category: 'disaster', area: 'US', name: 'Disaster Distress Helpline',
     what: 'Free, 24/7 support by call or text after a disaster, in many languages.',
     phone: '1-800-985-5990', source: 'SAMHSA', verified: '2026-10-08' },
@@ -81,7 +78,7 @@ export function toShelters(features: any[], petsFirst = false): SpecialResource[
       return {
         category: 'disaster' as const, area: String(a.state ?? ''),
         name: String(a.shelter_name).replace(/\b\w/g, (c: string) => c.toUpperCase()),
-        what: `Emergency shelter, open now. ${place}.${pets ? ' Accepts pets: bring a carrier, leash, food, and vaccine records.' : ''} Please call 211 to confirm before you go.`,
+        what: `Emergency shelter, open now. ${place}.${pets ? ' Accepts pets: bring a carrier, leash, food, and vaccine records.' : ''} Please check the Red Cross map to confirm before you go.`,
         source: 'FEMA Open Shelters', verified: 'live', pets,
       };
     });

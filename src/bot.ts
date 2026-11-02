@@ -106,8 +106,9 @@ Rules:
 - Say "shelter", never "facility" or "placement". Never say "the homeless" or "clients".`;
 
 // The small model likes to add its own offer ("I can help you find shelter"), which can
-// clash with the app's next step, so only its caring sentences are kept.
-const OFFER = /\b(?:i|we)(?:'ll| can| could| will)\b|\b(?:let me|let's|options?|opciones|puedo|podemos|posso|hay lugares)\b/i;
+// clash with the app's next step, so only its caring sentences are kept. A caring sentence
+// never needs a number, so any digit means it wrote a phone number or other fact.
+const OFFER = /\d|\b(?:i|we)(?:'ll| can| could| will)\b|\b(?:let me|let's|options?|opciones|puedo|podemos|posso|hay lugares)\b/i;
 const caringOnly = (text: string) => text.split(/(?<=[.!?])\s+/).filter(s => !OFFER.test(s)).join(' ').trim();
 
 function keywordSearch(text: string) {
@@ -293,7 +294,8 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
   q.type ??= state.need;
   // A storm, fire, or flood coming: they need a safe place, so look for emergency shelters.
   const emergency = /evacuat\w*|hurricane|tropical storm|storm surge|flood\w*|wildfire|fire evac|tornado|hurac[aá]n|inundaci\w*|evacuar/i.test(allUser);
-  if (emergency && !q.type) q.type = 'shelter';
+  // The model sometimes files an evacuation under "resources", so that only counts if they asked for it.
+  if (emergency && (!q.type || (q.type === 'resources' && !keywordSearch(last).type))) q.type = 'shelter';
   if (q.type) state.need = q.type;
 
   // 2. Work out a general area: device location, then zip, then a nearby place, then city.
@@ -342,7 +344,7 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
   const results = hasPlace && q.type ? searchListings(all, { ...q, night }) : [];
   const alerts = hasPlace ? await alertsFor(q.state) : [];
   // Emergency shelters when there's a disaster: FEMA's live list (pet-friendly first if they
-  // have pets), and always the Red Cross map and 211, since counties often report late.
+  // have pets), and always the Red Cross map, since counties often report late.
   const disaster = hasPlace && q.type === 'shelter' && (emergency || alerts.length > 0);
   const emergencyShelters = disaster ? await openShelters(q.state, aboutPets(allUser)) : [];
   const disasterResources = disaster ? [...emergencyShelters, ...DISASTER_HELP] : undefined;
@@ -364,7 +366,7 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
   if (!q.type) {
     question = 'Are you looking for shelter, or is there something else you need first, like food?';
   } else if (!hasPlace && state.locationAsks >= 2) {
-    statement = `That's okay. Whenever you can tell me a city, I can look. You can also call or text 211 any time for help finding ${need}.`;
+    statement = `That's okay. Whenever you can tell me a city, I can look. You can also tap "Use my location". It's never saved.`;
   } else if (!hasPlace) {
     state.locationAsks++;
     askedLocation = true;
@@ -378,14 +380,14 @@ export async function respond(all: Listing[], history: ChatMessage[], ctx: Conte
   } else if (disaster) {
     statement = `I don't see a regular shelter listing near there.`;
   } else {
-    statement = `I couldn't find ${need} listings near there yet. You can call or text 211, which helps anywhere in the US.`;
+    statement = `I couldn't find ${need} listings near there yet. If you tell me a nearby city, I can look there too.`;
   }
   if (disaster) {
     statement += emergencyShelters.length
       ? (aboutPets(allUser) && emergencyShelters.some(r => /Accepts pets/.test(r.what))
         ? ' Emergency shelters are open in your state. The ones that take pets are listed first.'
         : ' Emergency shelters are open in your state, listed below.')
-      : " I don't see emergency shelters posted for your state yet. Counties often post them late, so the Red Cross map and 211 below will have the newest list, including ones that take pets.";
+      : " I don't see emergency shelters posted for your state yet. Counties often post them late, so the Red Cross map below will have the newest list.";
     statement = statement.trim();
   }
   let choices: Choice[] | undefined;

@@ -98,9 +98,19 @@ test('stays stateless and caps the location counter', async () => {
   assert.ok(r.state.locationAsks <= 10);
 });
 
-test('a hurricane evacuation gets emergency shelter help, with the Red Cross map and 211', async () => {
+test('a hurricane evacuation gets emergency shelter help, with the Red Cross map', async () => {
   const r = await respond(all, user('hurricane coming, we have to evacuate with our dog. I am in Seattle'));
   assert.ok(r.resources?.some(x => x.url?.includes('redcross.org')));
-  assert.ok(r.resources?.some(x => x.phone === '211'));
-  assert.match(r.reply, /Emergency shelters are open|Red Cross map and 211/);
+  assert.match(r.reply, /Emergency shelters are open|Red Cross map below/);
+});
+
+test('nothing found still leaves a next step', async () => {
+  const r = await respond(all, user('I need shelter in Portland, Oregon'));
+  assert.equal(r.results.length, 0);
+  assert.match(r.reply, /If you tell me a nearby city, I can look there too\./);
+});
+
+test('after two location questions, she offers the location button', async () => {
+  const r = await respond(all, user('I need food'), { state: { locationAsks: 2 } });
+  assert.match(r.reply, /^That's okay\. Whenever you can tell me a city, I can look\. You can also tap "Use my location"\./);
 });

@@ -84,7 +84,8 @@ Every resource lists its source and the date it was checked. Hotlines change: re
 - Say what it is: an automated helper, not a person.
 - Say what it can't do: it can't hold a bed, and listings can change. "Please call ahead."
 - Say why it asks: "So I can show places close to you. I don't save it."
-- Be honest when nothing is found, and always give a next step (211, crisis lines, nearby options). No dead ends.
+- Be honest when nothing is found, and always give a next step (a nearby city, the location button, crisis lines). No dead ends.
+- Never refer people to 211.
 
 ## 5. Voice and choice
 
